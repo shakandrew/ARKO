@@ -42,13 +42,14 @@ algo_begin:
 	shl ebx, cl
 	and ebx, esi; ebx - are there any coincidences 
 	
-	cmp ebx, 0; if ebx != 0 then
-	jnz next
-	mov [edi], ch
-	inc edi
-next:			;else 
 	inc eax
+	cmp ebx, 0
+	jnz algo_begin
+	
+	mov [edi], ch
+	inc edi 
 	jmp algo_begin
+	
 algo_end:
 	
 	mov byte [edi], 0
