@@ -1,5 +1,3 @@
-section .data
-	var DB 'a'
 section .text
 global f
 
@@ -12,16 +10,19 @@ f:
 	push ecx
 	push edx
 	push esi
+	push edi
 
 	mov eax, [ebp+12]
 	mov esi, 0	;mask is stored there
 mask_begin:
-	mov dh, [eax]
-	test dh, dh
+	mov ch, [eax]
+	test ch, ch
 	jz mask_end
 	
-	call bit_mask
-
+	mov ebx, 1
+	mov cl, ch
+	sub cl,'a'
+	shl ebx, cl
 	or esi, ebx
 	
 	inc eax
@@ -29,44 +30,31 @@ mask_begin:
 mask_end:
 
 	mov eax, [ebp+8]
-	mov ch, 0
+	mov edi, [ebp+8]
 algo_begin:
-
-	mov dh, [eax]
-	test dh, dh
-	jz algo_end
-	
-	call bit_mask
-
-	and ebx, esi
-	
-	test ebx, 0
-	jnz next
-		mov eax, 0
-	next:
-	inc ch
-	jmp algo_begin
-algo_end:
-	
-	mov eax, [ebp+8]
-	mov edx, [ebp+8]
-	mov cl, ch
-zero_del_begin:
-	test cl,cl
-	jz zero_del_end
-	
 	mov ch, [eax]
 	test ch,ch
-
-	jz no_change
-		mov eax, 0
-		mov [edx], ch 	
-		inc edx
-	no_change:
+	jz algo_end
+	
+	mov ebx, 1
+	mov cl, ch
+	sub cl,'a'
+	shl ebx, cl
+	and ebx, esi; ebx - are there any coincidences 
 	
 	inc eax
-	dec cl
-zero_del_end:
+	cmp ebx, 0
+	jnz algo_begin
+	
+	mov [edi], ch
+	inc edi 
+	jmp algo_begin
+	
+algo_end:
+	
+	mov byte [edi], 0
+
+	pop edi
 	pop esi
 	pop edx
 	pop ecx
@@ -74,13 +62,4 @@ zero_del_end:
 	pop eax
 	pop ebp
 ret
-
-bit_mask:
-	mov ebx, 1
-	mov dl, dh
-	sub dl,[var]
-	inc dl
-	mov cl, dl
-	shl ebx, cl
-	ret
 
