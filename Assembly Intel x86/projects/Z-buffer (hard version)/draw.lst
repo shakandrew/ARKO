@@ -1,0 +1,1119 @@
+     1                                  ;=====================================================================
+     2                                  ; Laboratorium ARKO - 5.3 Z-bufor
+     3                                  ;
+     4                                  ; Autor: Aleksander Szulc
+     5                                  ; Data:  2015-05-25
+     6                                  ;
+     7                                  ;=====================================================================
+     8                                  
+     9                                  ;###################################################################;
+    10                                  ; MACROS 															;
+    11                                  ;###################################################################;
+    12                                  ; DEFINES ----> DRAWTRIANGLE FUNCTION ONLY!!!
+    13                                  ; Functions parameters stack addresses
+    14                                  %define IMAGE 	ebp+8
+    15                                  %define ZBUF 	ebp+12
+    16                                  %define XSIZE 	ebp+16
+    17                                  %define YSIZE 	ebp+20
+    18                                  %define VERT	ebp+24
+    19                                  %define RGB 	ebp+28
+    20                                  ; Local variables stack addresses
+    21                                  %define	AX		ebp-4	 
+    22                                  %define	AY		ebp-8
+    23                                  %define	AZ		ebp-12
+    24                                  %define	AR		ebp-16
+    25                                  %define	AG		ebp-20
+    26                                  %define	AB		ebp-24
+    27                                  %define	BX		ebp-28	 
+    28                                  %define	BY		ebp-32
+    29                                  %define	BZ		ebp-36
+    30                                  %define	BR		ebp-40
+    31                                  %define	BG		ebp-44
+    32                                  %define	BB		ebp-48
+    33                                  %define	CX		ebp-52	 
+    34                                  %define	CY		ebp-56
+    35                                  %define	CZ		ebp-60
+    36                                  %define	CR		ebp-64
+    37                                  %define	CG		ebp-68
+    38                                  %define	CB		ebp-72
+    39                                  %define	ABX		ebp-76	 
+    40                                  %define	ABY		ebp-80
+    41                                  %define	ABZ		ebp-84
+    42                                  %define	ABR		ebp-88
+    43                                  %define	ABG		ebp-92
+    44                                  %define	ABB		ebp-96
+    45                                  %define	BCX		ebp-100
+    46                                  %define	BCY		ebp-104
+    47                                  %define	BCZ		ebp-108
+    48                                  %define	BCR		ebp-112
+    49                                  %define	BCG		ebp-116
+    50                                  %define	BCB		ebp-120
+    51                                  %define	ACX		ebp-124	 
+    52                                  %define	ACY		ebp-128
+    53                                  %define	ACZ		ebp-132
+    54                                  %define	ACR		ebp-136
+    55                                  %define	ACG		ebp-140
+    56                                  %define	ACB		ebp-144
+    57                                  
+    58                                  ; Function call macro ==============================================
+    59                                  ; With 1 parameter
+    60                                  %macro fcall 2			; %1 function name, %2 param
+    61                                  		push	%2
+    62                                  		call	%1
+    63                                  		add		esp, 4	; 1x4B params at stack
+    64                                  %endmacro
+    65                                  ; With 2 parameters - 
+    66                                  %macro fcall 3			; %1 function name, %2-3 params
+    67                                  		push	%3		; pass params in reverse order
+    68                                  		push	%2
+    69                                  		call	%1
+    70                                  		add		esp, 8	; 2x4B params at stack
+    71                                  %endmacro
+    72                                  ; With 4 parameters - 
+    73                                  %macro fcall 4			; %1 function name, %2-4 params
+    74                                  		push	%4		; pass params in reverse order
+    75                                  		push	%3
+    76                                  		push	%2
+    77                                  		call	%1
+    78                                  		add		esp, 12	; 3x4B params at stack
+    79                                  %endmacro
+    80                                  ; With 5 parameters - 
+    81                                  %macro fcall 5			; %1 function name, %2-5 params
+    82                                  		push	%5		; pass params in reverse order
+    83                                  		push	%4
+    84                                  		push	%3
+    85                                  		push	%2
+    86                                  		call	%1
+    87                                  		add		esp, 16	; 4x4B params at stack
+    88                                  %endmacro
+    89                                  ; With 6 parameters 
+    90                                  %macro fcall 6			; %1 function name, %2-6 params
+    91                                  		push	%6		; pass params in reverse order
+    92                                  		push	%5
+    93                                  		push	%4
+    94                                  		push	%3
+    95                                  		push	%2
+    96                                  		call	%1
+    97                                  		add		esp, 20	; 5x4B params at stack
+    98                                  %endmacro
+    99                                  ; With 8 parameters 
+   100                                  %macro fcall 8			; %1 function name, %2-8 params
+   101                                  		push	%8		; pass params in reverse order
+   102                                  		push	%7
+   103                                  		push	%6
+   104                                  		push	%5
+   105                                  		push	%4
+   106                                  		push	%3
+   107                                  		push	%2
+   108                                  		call	%1
+   109                                  		add		esp, 28	; 7x4B params at stack
+   110                                  %endmacro
+   111                                  ; ==================================================================
+   112                                  ; Subroutine prologue ==============================================
+   113                                  ; With 1 modified register.
+   114                                  %macro enter 2
+   115                                  		push 	ebp     	; Save the old base pointer value.
+   116                                  		mov 	ebp, esp 	; Set the new base pointer value.
+   117                                  		sub 	esp, %2   	; Make room for local variables.
+   118                                  		push	%1			; Save registers that will be modified.
+   119                                  %endmacro
+   120                                  ; With 2 modified registers.
+   121                                  %macro enter 3
+   122                                  		push 	ebp     	; Save the old base pointer value.
+   123                                  		mov 	ebp, esp 	; Set the new base pointer value.
+   124                                  		sub 	esp, %3   	; Make room for local variables.
+   125                                  		push	%1			; Save registers that will be modified.
+   126                                  		push 	%2
+   127                                  %endmacro
+   128                                  ; With 3 modified registers.
+   129                                  %macro enter 4
+   130                                  		push 	ebp  	  	; Save the old base pointer value.
+   131                                  		mov 	ebp, esp 	; Set the new base pointer value.
+   132                                  		sub 	esp, %4   	; Make room for local variables.
+   133                                  		push	%1			; Save registers that will be modified.
+   134                                  		push 	%2
+   135                                  		push	%3
+   136                                  %endmacro
+   137                                  ; With 4 modified registers.
+   138                                  %macro enter 5
+   139                                  		push 	ebp     	; Save the old base pointer value.
+   140                                  		mov 	ebp, esp 	; Set the new base pointer value.
+   141                                  		sub 	esp, %5   	; Make room for local variables.
+   142                                  		push	%1			; Save registers that will be modified.
+   143                                  		push	%2
+   144                                  		push	%3
+   145                                  		push	%4
+   146                                  %endmacro
+   147                                  ; With 5 modified registers.
+   148                                  %macro enter 6
+   149                                  		push 	ebp     	; Save the old base pointer value.
+   150                                  		mov 	ebp, esp 	; Set the new base pointer value.
+   151                                  		sub 	esp, %6   	; Make room for local variables.
+   152                                  		push	%1			; Save registers that will be modified.
+   153                                  		push	%2
+   154                                  		push	%3
+   155                                  		push	%4
+   156                                  		push	%5
+   157                                  %endmacro
+   158                                  
+   159                                  ; ===================================================================
+   160                                  ; Subroutine epilogue ===============================================
+   161                                  ; With 1 modified register.
+   162                                  %macro leave 1
+   163                                  		pop 	%1			; Recover calle-saved register values.
+   164                                  		mov 	esp, ebp 	; Deallocate local variables.
+   165                                  		pop 	ebp 		; Restore the caller's base pointer value.
+   166                                  		ret
+   167                                  %endmacro
+   168                                  ; With 2 modified registers.
+   169                                  %macro leave 2
+   170                                  		pop 	%2			; Recover calle-saved register values.
+   171                                  		pop		%1			
+   172                                  		mov 	esp, ebp 	; Deallocate local variables.
+   173                                  		pop 	ebp 		; Restore the caller's base pointer value.
+   174                                  		ret
+   175                                  %endmacro
+   176                                  ; With 3 modified registers.
+   177                                  %macro leave 3
+   178                                  		pop 	%3			; Recover calle-saved register values.
+   179                                  		pop		%2
+   180                                  		pop		%1			
+   181                                  		mov 	esp, ebp 	; Deallocate local variables.
+   182                                  		pop 	ebp 		; Restore the caller's base pointer value.
+   183                                  		ret
+   184                                  %endmacro
+   185                                  ; With 4 modified registers.
+   186                                  %macro leave 4
+   187                                  		pop 	%4			; Recover calle-saved register values.
+   188                                  		pop		%3
+   189                                  		pop		%2
+   190                                  		pop		%1			
+   191                                  		mov 	esp, ebp 	; Deallocate local variables.
+   192                                  		pop 	ebp 		; Restore the caller's base pointer value.
+   193                                  		ret
+   194                                  %endmacro
+   195                                  ; With 4 modified registers.
+   196                                  %macro leave 5
+   197                                  		pop 	%5			; Recover calle-saved register values.
+   198                                  		pop		%4
+   199                                  		pop		%3
+   200                                  		pop		%2
+   201                                  		pop		%1			
+   202                                  		mov 	esp, ebp 	; Deallocate local variables.
+   203                                  		pop 	ebp 		; Restore the caller's base pointer value.
+   204                                  		ret
+   205                                  %endmacro
+   206                                  ; ===================================================================
+   207                                  
+   208                                  ;section .data
+   209                                  
+   210                                  section	.text
+   211                                  global  drawTriangle
+   212                                  
+   213                                  
+   214                                  ;###################################################################;
+   215                                  ; MAIN																;
+   216                                  ;###################################################################;
+   217                                  
+   218                                  drawTriangle:
+   219                                  		enter	ebx, ecx, esi, edi, 144	; subroutine prologue
+   219 00000000 55                  <1>  push ebp
+   219 00000001 89E5                <1>  mov ebp, esp
+   219 00000003 81EC90000000        <1>  sub esp, %5
+   219 00000009 53                  <1>  push %1
+   219 0000000A 51                  <1>  push %2
+   219 0000000B 56                  <1>  push %3
+   219 0000000C 57                  <1>  push %4
+   220                                  
+   221                                  		; Save vertices and colors to stack
+   222                                  		; A.X/Y/Z and A.R/G/B to stack
+   223 0000000D 8B4518                  		mov		eax, [VERT]			; *A.X to eax
+   224 00000010 8B18                    		mov 	ebx, [eax]		    ; A.X to ebx
+   225 00000012 895DFC                  		mov		[AX], ebx			; A.X to stack
+   226 00000015 8B5804                  		mov 	ebx, [eax+4]		; A.Y to ebx
+   227 00000018 895DF8                  		mov		[AY], ebx			; A.Y to stack
+   228 0000001B 8B5808                  		mov 	ebx, [eax+8]		; A.Z to ebx
+   229 0000001E 895DF4                  		mov		[AZ], ebx			; A.Z to stack
+   230 00000021 8B451C                  		mov		eax, [RGB]			; *A.R to eax
+   231 00000024 8B18                    		mov 	ebx, [eax]		    ; A.R to ebx
+   232 00000026 895DF0                  		mov		[AR], ebx			; A.R to stack
+   233 00000029 8B5804                  		mov 	ebx, [eax+4]		; A.G to ebx
+   234 0000002C 895DEC                  		mov		[AG], ebx			; A.G to stack
+   235 0000002F 8B5808                  		mov 	ebx, [eax+8]		; A.B to ebx
+   236 00000032 895DE8                  		mov		[AB], ebx			; A.B to stack
+   237                                  		
+   238                                  		; B.X/Y/Z and B.R/G/B to stack
+   239 00000035 8B4518                  		mov		eax, [VERT]			; *B.X to eax
+   240 00000038 8B580C                  		mov 	ebx, [eax+12]		    ; B.X to ebx
+   241 0000003B 895DE4                  		mov		[BX], ebx			; B.X to stack
+   242 0000003E 8B5810                  		mov 	ebx, [eax+16]		; B.Y to ebx
+   243 00000041 895DE0                  		mov		[BY], ebx			; B.Y to stack
+   244 00000044 8B5814                  		mov 	ebx, [eax+20]		; B.Z to ebx
+   245 00000047 895DDC                  		mov		[BZ], ebx			; B.Z to stack
+   246 0000004A 8B451C                  		mov		eax, [RGB]			; *B.R to eax
+   247 0000004D 8B580C                  		mov 	ebx, [eax+12]		    ; B.R to ebx
+   248 00000050 895DD8                  		mov		[BR], ebx			; B.R to stack
+   249 00000053 8B5810                  		mov 	ebx, [eax+16]		; B.G to ebx
+   250 00000056 895DD4                  		mov		[BG], ebx			; B.G to stack
+   251 00000059 8B5814                  		mov 	ebx, [eax+20]		; B.B to ebx
+   252 0000005C 895DD0                  		mov		[BB], ebx			; B.B to stack
+   253                                  		
+   254                                  		; C.X/Y/Z and C.R/G/B to stack
+   255 0000005F 8B4518                  		mov		eax, [VERT]			; *C.X to eax
+   256 00000062 8B5818                  		mov 	ebx, [eax+24]		    ; C.X to ebx
+   257 00000065 895DCC                  		mov		[CX], ebx			; C.X to stack
+   258 00000068 8B581C                  		mov 	ebx, [eax+28]		; C.Y to ebx
+   259 0000006B 895DC8                  		mov		[CY], ebx			; C.Y to stack
+   260 0000006E 8B5820                  		mov 	ebx, [eax+32]		; C.Z to ebx
+   261 00000071 895DC4                  		mov		[CZ], ebx			; C.Z to stack
+   262 00000074 8B451C                  		mov		eax, [RGB]			; *C.R to eax
+   263 00000077 8B5818                  		mov 	ebx, [eax+24]		    ; C.R to ebx
+   264 0000007A 895DC0                  		mov		[CR], ebx			; C.R to stack
+   265 0000007D 8B581C                  		mov 	ebx, [eax+28]		; C.G to ebx
+   266 00000080 895DBC                  		mov		[CG], ebx			; C.G to stack
+   267 00000083 8B5820                  		mov 	ebx, [eax+32]		; C.B to ebx
+   268 00000086 895DB8                  		mov		[CB], ebx			; C.B to stack
+   269                                  		; ===========================================================
+   270                                  		
+   271                                  		; Sort vertices by Y.
+   272 00000089 8D45FC                  		lea		eax, [AX]
+   273 0000008C 8D5DE4                  		lea		ebx, [BX]
+   274 0000008F 8D4DCC                  		lea		ecx, [CX]
+   275                                  		fcall	sort, eax, ebx, ecx
+   275 00000092 51                  <1>  push %4
+   275 00000093 53                  <1>  push %3
+   275 00000094 50                  <1>  push %2
+   275 00000095 E8D8040000          <1>  call %1
+   275 0000009A 83C40C              <1>  add esp, 12
+   276                                  		
+   277                                  		; ************** Triangle filler *****************************
+   278                                  		; AB = A, AC = A, BC = B
+   279 0000009D 8D45B4                  		lea		eax, [ABX]
+   280 000000A0 8D5DFC                  		lea		ebx, [AX]
+   281                                  		fcall	vassign, eax, ebx	; AB = A
+   281 000000A3 53                  <1>  push %3
+   281 000000A4 50                  <1>  push %2
+   281 000000A5 E880050000          <1>  call %1
+   281 000000AA 83C408              <1>  add esp, 8
+   282 000000AD 8D4584                  		lea		eax, [ACX]
+   283 000000B0 8D5DFC                  		lea		ebx, [AX]
+   284                                  		fcall	vassign, eax, ebx	; AC = A
+   284 000000B3 53                  <1>  push %3
+   284 000000B4 50                  <1>  push %2
+   284 000000B5 E870050000          <1>  call %1
+   284 000000BA 83C408              <1>  add esp, 8
+   285 000000BD 8D459C                  		lea		eax, [BCX]
+   286 000000C0 8D5DE4                  		lea		ebx, [BX]
+   287                                  		fcall	vassign, eax, ebx	; BC = B
+   287 000000C3 53                  <1>  push %3
+   287 000000C4 50                  <1>  push %2
+   287 000000C5 E860050000          <1>  call %1
+   287 000000CA 83C408              <1>  add esp, 8
+   288                                  		
+   289                                  		; Firstly draw lines between AB and AC sides of triangle.	
+   290                                  		
+   291                                  		; If A.Y != B.Y - fill triangle from A to B
+   292 000000CD 8B45F8                  		mov		eax, [AY]
+   293 000000D0 8B5DE0                  		mov 	ebx, [BY]
+   294 000000D3 39D8                    		cmp		eax, ebx
+   295 000000D5 751E                    		jne		AB_AC
+   296                                  		; Else draw horizontal line A-B and proceed to BC_AC
+   297 000000D7 8D45FC                  		lea		eax, [AX]
+   298 000000DA 8D5DE4                  		lea		ebx, [BX]
+   299                                  		fcall	horizline, DWORD[IMAGE], DWORD[XSIZE], eax, ebx, DWORD[ZBUF]
+   299 000000DD FF750C              <1>  push %6
+   299 000000E0 53                  <1>  push %5
+   299 000000E1 50                  <1>  push %4
+   299 000000E2 FF7510              <1>  push %3
+   299 000000E5 FF7508              <1>  push %2
+   299 000000E8 E8B4020000          <1>  call %1
+   299 000000ED 83C414              <1>  add esp, 20
+   300 000000F0 E93E010000              		jmp		AB_AC_end
+   301                                  		
+   302                                  AB_AC:		
+   303                                  		; Interpolate RGB values of AB.
+   304                                  		; AB.x = B.x * (AB.y-A.y)/(B.y-A.y) + A.x * (B.y-AB.y)/(B.y-A.y);
+   305                                  		fcall 	interpolate, DWORD[AX], DWORD[BX], DWORD[ABY], DWORD[AY], DWORD[BY]
+   305 000000F5 FF75E0              <1>  push %6
+   305 000000F8 FF75F8              <1>  push %5
+   305 000000FB FF75B0              <1>  push %4
+   305 000000FE FF75E4              <1>  push %3
+   305 00000101 FF75FC              <1>  push %2
+   305 00000104 E827040000          <1>  call %1
+   305 00000109 83C414              <1>  add esp, 20
+   306 0000010C 8945B4                  		mov		[ABX], eax		; AB.X = X
+   307                                  		; AB.z = B.z * (AB.y-A.y)/(B.y-A.y) + A.z * (B.y-AB.y)/(B.y-A.y);	
+   308                                  		fcall 	interpolate, DWORD[AZ], DWORD[BZ], DWORD[ABY], DWORD[AY], DWORD[BY]
+   308 0000010F FF75E0              <1>  push %6
+   308 00000112 FF75F8              <1>  push %5
+   308 00000115 FF75B0              <1>  push %4
+   308 00000118 FF75DC              <1>  push %3
+   308 0000011B FF75F4              <1>  push %2
+   308 0000011E E80D040000          <1>  call %1
+   308 00000123 83C414              <1>  add esp, 20
+   309 00000126 8945AC                  		mov		[ABZ], eax		; AB.Z = Z and save to zbuf
+   310                                  		; AB.r = B.r * (AB.y-A.y)/(B.y-A.y) + A.r * (B.y-AB.y)/(B.y-A.y);
+   311                                  		fcall 	interpolate, DWORD[AR], DWORD[BR], DWORD[ABY], DWORD[AY], DWORD[BY]
+   311 00000129 FF75E0              <1>  push %6
+   311 0000012C FF75F8              <1>  push %5
+   311 0000012F FF75B0              <1>  push %4
+   311 00000132 FF75D8              <1>  push %3
+   311 00000135 FF75F0              <1>  push %2
+   311 00000138 E8F3030000          <1>  call %1
+   311 0000013D 83C414              <1>  add esp, 20
+   312 00000140 8945A8                  		mov		[ABR], eax		; AB.R = R
+   313                                  		; AB.g = B.g * (AB.y-A.y)/(B.y-A.y) + A.g * (B.y-AB.y)/(B.y-A.y);
+   314                                  		fcall 	interpolate, DWORD[AG], DWORD[BG], DWORD[ABY], DWORD[AY], DWORD[BY]
+   314 00000143 FF75E0              <1>  push %6
+   314 00000146 FF75F8              <1>  push %5
+   314 00000149 FF75B0              <1>  push %4
+   314 0000014C FF75D4              <1>  push %3
+   314 0000014F FF75EC              <1>  push %2
+   314 00000152 E8D9030000          <1>  call %1
+   314 00000157 83C414              <1>  add esp, 20
+   315 0000015A 8945A4                  		mov		[ABG], eax		; AB.G = G
+   316                                  		; AB.b = B.b * (AB.y-A.y)/(B.y-A.y) + A.b * (B.y-AB.y)/(B.y-A.y);
+   317                                  		fcall 	interpolate, DWORD[AB], DWORD[BB], DWORD[ABY], DWORD[AY], DWORD[BY]
+   317 0000015D FF75E0              <1>  push %6
+   317 00000160 FF75F8              <1>  push %5
+   317 00000163 FF75B0              <1>  push %4
+   317 00000166 FF75D0              <1>  push %3
+   317 00000169 FF75E8              <1>  push %2
+   317 0000016C E8BF030000          <1>  call %1
+   317 00000171 83C414              <1>  add esp, 20
+   318 00000174 8945A0                  		mov		[ABB], eax		; AB.B = B
+   319                                  		
+   320                                  		; Interpolate RGB values of AC.
+   321                                  		; AC.x = C.x * (AC.y-A.y)/(C.y-A.y) + A.x * (C.y-AC.y)/(C.y-A.y);
+   322                                  		fcall 	interpolate, DWORD[AX], DWORD[CX], DWORD[ACY], DWORD[AY], DWORD[CY]
+   322 00000177 FF75C8              <1>  push %6
+   322 0000017A FF75F8              <1>  push %5
+   322 0000017D FF7580              <1>  push %4
+   322 00000180 FF75CC              <1>  push %3
+   322 00000183 FF75FC              <1>  push %2
+   322 00000186 E8A5030000          <1>  call %1
+   322 0000018B 83C414              <1>  add esp, 20
+   323 0000018E 894584                  		mov		[ACX], eax		; AC.X = X
+   324                                  		; AC.z = C.z * (AC.y-A.y)/(C.y-A.y) + A.z * (C.y-AC.y)/(C.y-A.y);
+   325                                  		fcall 	interpolate, DWORD[AZ], DWORD[CZ], DWORD[ACY], DWORD[AY], DWORD[CY]
+   325 00000191 FF75C8              <1>  push %6
+   325 00000194 FF75F8              <1>  push %5
+   325 00000197 FF7580              <1>  push %4
+   325 0000019A FF75C4              <1>  push %3
+   325 0000019D FF75F4              <1>  push %2
+   325 000001A0 E88B030000          <1>  call %1
+   325 000001A5 83C414              <1>  add esp, 20
+   326 000001A8 89857CFFFFFF            		mov		[ACZ], eax		; AC.Z = Z and save to zbuf
+   327                                  		; AC.r = C.r * (AC.y-A.y)/(C.y-A.y) + A.r * (C.y-AC.y)/(C.y-A.y);
+   328                                  		fcall 	interpolate, DWORD[AR], DWORD[CR], DWORD[ACY], DWORD[AY], DWORD[CY]
+   328 000001AE FF75C8              <1>  push %6
+   328 000001B1 FF75F8              <1>  push %5
+   328 000001B4 FF7580              <1>  push %4
+   328 000001B7 FF75C0              <1>  push %3
+   328 000001BA FF75F0              <1>  push %2
+   328 000001BD E86E030000          <1>  call %1
+   328 000001C2 83C414              <1>  add esp, 20
+   329 000001C5 898578FFFFFF            		mov		[ACR], eax		; AC.R = R
+   330                                  		; AC.g = C.g * (AC.y-A.y)/(C.y-A.y) + A.g * (C.y-AC.y)/(C.y-A.y);
+   331                                  		fcall 	interpolate, DWORD[AG], DWORD[CG], DWORD[ACY], DWORD[AY], DWORD[CY]
+   331 000001CB FF75C8              <1>  push %6
+   331 000001CE FF75F8              <1>  push %5
+   331 000001D1 FF7580              <1>  push %4
+   331 000001D4 FF75BC              <1>  push %3
+   331 000001D7 FF75EC              <1>  push %2
+   331 000001DA E851030000          <1>  call %1
+   331 000001DF 83C414              <1>  add esp, 20
+   332 000001E2 898574FFFFFF            		mov		[ACG], eax		; AC.G = G
+   333                                  		; AC.b = C.b * (AC.y-A.y)/(C.y-A.y) + A.b * (C.y-AC.y)/(C.y-A.y);
+   334                                  		fcall 	interpolate, DWORD[AB], DWORD[CB], DWORD[ACY], DWORD[AY], DWORD[CY]
+   334 000001E8 FF75C8              <1>  push %6
+   334 000001EB FF75F8              <1>  push %5
+   334 000001EE FF7580              <1>  push %4
+   334 000001F1 FF75B8              <1>  push %3
+   334 000001F4 FF75E8              <1>  push %2
+   334 000001F7 E834030000          <1>  call %1
+   334 000001FC 83C414              <1>  add esp, 20
+   335 000001FF 898570FFFFFF            		mov		[ACB], eax		; AC.B = B
+   336                                  					
+   337                                  		; Draw horizline between AB and AC.
+   338 00000205 8D45B4                  		lea		eax, [ABX]
+   339 00000208 8D5D84                  		lea		ebx, [ACX]
+   340                                  		fcall 	horizline, DWORD[IMAGE], DWORD[XSIZE], eax, ebx, DWORD[ZBUF]		
+   340 0000020B FF750C              <1>  push %6
+   340 0000020E 53                  <1>  push %5
+   340 0000020F 50                  <1>  push %4
+   340 00000210 FF7510              <1>  push %3
+   340 00000213 FF7508              <1>  push %2
+   340 00000216 E886010000          <1>  call %1
+   340 0000021B 83C414              <1>  add esp, 20
+   341                                  
+   342                                  		; Increment AB.Y
+   343 0000021E FF45B0                  		inc		DWORD [ABY]			; AB.Y++
+   344 00000221 FF4580                  		inc		DWORD [ACY]			; AC.Y++
+   345                                  		; If AB.Y >= B.Y - proceed to BC_AC
+   346 00000224 8B45B0                  		mov		eax, [ABY]			; eax = AB.Y
+   347 00000227 8B5DE0                  		mov		ebx, [BY]			; ebx = B.Y
+   348 0000022A 39D8                    		cmp		eax, ebx
+   349 0000022C 7D05                    		jge		AB_AC_end
+   350                                  		; Else - continue AB_AC loop
+   351 0000022E E9C2FEFFFF              		jmp AB_AC
+   352                                  		
+   353                                  AB_AC_end:		
+   354                                  
+   355                                  		; Then secondly draw lines between BC and AC sides of triangle.		
+   356                                  		
+   357                                  		; If B.Y != C.Y - fill triangle from B to C
+   358 00000233 8B45E0                  		mov		eax, [BY]
+   359 00000236 8B5DC8                  		mov 	ebx, [CY]
+   360 00000239 39D8                    		cmp		eax, ebx
+   361 0000023B 751E                    		jne		BC_AC
+   362                                  		; Else draw horizontal line B-C and end filling
+   363 0000023D 8D45E4                  		lea		eax, [BX]
+   364 00000240 8D5DCC                  		lea		ebx, [CX]
+   365                                  		fcall	horizline, DWORD[IMAGE], DWORD[XSIZE], eax, ebx, DWORD[ZBUF]
+   365 00000243 FF750C              <1>  push %6
+   365 00000246 53                  <1>  push %5
+   365 00000247 50                  <1>  push %4
+   365 00000248 FF7510              <1>  push %3
+   365 0000024B FF7508              <1>  push %2
+   365 0000024E E84E010000          <1>  call %1
+   365 00000253 83C414              <1>  add esp, 20
+   366 00000256 E93E010000              		jmp		BC_AC_end
+   367                                  		
+   368                                  BC_AC:		
+   369                                  		; Interpolate RGB values of BC.
+   370                                  		; BC.x = C.x * (BC.y-B.y)/(C.y-B.y) + B.x * (C.y-BC.y)/(C.y-B.y);	
+   371                                  		fcall 	interpolate, DWORD[BX], DWORD[CX], DWORD[BCY], DWORD[BY], DWORD[CY]
+   371 0000025B FF75C8              <1>  push %6
+   371 0000025E FF75E0              <1>  push %5
+   371 00000261 FF7598              <1>  push %4
+   371 00000264 FF75CC              <1>  push %3
+   371 00000267 FF75E4              <1>  push %2
+   371 0000026A E8C1020000          <1>  call %1
+   371 0000026F 83C414              <1>  add esp, 20
+   372 00000272 89459C                  		mov		[BCX], eax		; BC.X = X
+   373                                  		; BC.z = C.z * (BC.y-B.y)/(C.y-B.y) + B.z * (C.y-BC.y)/(C.y-B.y);	
+   374                                  		fcall 	interpolate, DWORD[BZ], DWORD[CZ], DWORD[BCY], DWORD[BY], DWORD[CY]
+   374 00000275 FF75C8              <1>  push %6
+   374 00000278 FF75E0              <1>  push %5
+   374 0000027B FF7598              <1>  push %4
+   374 0000027E FF75C4              <1>  push %3
+   374 00000281 FF75DC              <1>  push %2
+   374 00000284 E8A7020000          <1>  call %1
+   374 00000289 83C414              <1>  add esp, 20
+   375 0000028C 894594                  		mov		[BCZ], eax		; BC.Z = Z and save to zbuf
+   376                                  		; BC.r = C.r * (BC.y-B.y)/(C.y-B.y) + B.r * (C.y-BC.y)/(C.y-B.y);	
+   377                                  		fcall 	interpolate, DWORD[BR], DWORD[CR], DWORD[BCY], DWORD[BY], DWORD[CY]
+   377 0000028F FF75C8              <1>  push %6
+   377 00000292 FF75E0              <1>  push %5
+   377 00000295 FF7598              <1>  push %4
+   377 00000298 FF75C0              <1>  push %3
+   377 0000029B FF75D8              <1>  push %2
+   377 0000029E E88D020000          <1>  call %1
+   377 000002A3 83C414              <1>  add esp, 20
+   378 000002A6 894590                  		mov		[BCR], eax		; BC.R = R
+   379                                  		; BC.g = C.g * (BC.y-B.y)/(C.y-B.y) + B.g * (C.y-BC.y)/(C.y-B.y);	
+   380                                  		fcall 	interpolate, DWORD[BG], DWORD[CG], DWORD[BCY], DWORD[BY], DWORD[CY]
+   380 000002A9 FF75C8              <1>  push %6
+   380 000002AC FF75E0              <1>  push %5
+   380 000002AF FF7598              <1>  push %4
+   380 000002B2 FF75BC              <1>  push %3
+   380 000002B5 FF75D4              <1>  push %2
+   380 000002B8 E873020000          <1>  call %1
+   380 000002BD 83C414              <1>  add esp, 20
+   381 000002C0 89458C                  		mov		[BCG], eax		; BC.G = G
+   382                                  		; BC.b = C.b * (BC.y-B.y)/(C.y-B.y) + B.b * (C.y-BC.y)/(C.y-B.y);	
+   383                                  		fcall 	interpolate, DWORD[BB], DWORD[CB], DWORD[BCY], DWORD[BY], DWORD[CY]
+   383 000002C3 FF75C8              <1>  push %6
+   383 000002C6 FF75E0              <1>  push %5
+   383 000002C9 FF7598              <1>  push %4
+   383 000002CC FF75B8              <1>  push %3
+   383 000002CF FF75D0              <1>  push %2
+   383 000002D2 E859020000          <1>  call %1
+   383 000002D7 83C414              <1>  add esp, 20
+   384 000002DA 894588                  		mov		[BCB], eax		; BC.B = B
+   385                                  		
+   386                                  		; Interpolate RGB values of AC.
+   387                                  		; AC.x = C.x * (AC.y-A.y)/(C.y-A.y) + A.x * (C.y-AC.y)/(C.y-A.y);
+   388                                  		fcall 	interpolate, DWORD[AX], DWORD[CX], DWORD[ACY], DWORD[AY], DWORD[CY]
+   388 000002DD FF75C8              <1>  push %6
+   388 000002E0 FF75F8              <1>  push %5
+   388 000002E3 FF7580              <1>  push %4
+   388 000002E6 FF75CC              <1>  push %3
+   388 000002E9 FF75FC              <1>  push %2
+   388 000002EC E83F020000          <1>  call %1
+   388 000002F1 83C414              <1>  add esp, 20
+   389 000002F4 894584                  		mov		[ACX], eax		; AC.X = X
+   390                                  		; AC.z = C.z * (AC.y-A.y)/(C.y-A.y) + A.z * (C.y-AC.y)/(C.y-A.y);
+   391                                  		fcall 	interpolate, DWORD[AZ], DWORD[CZ], DWORD[ACY], DWORD[AY], DWORD[CY]
+   391 000002F7 FF75C8              <1>  push %6
+   391 000002FA FF75F8              <1>  push %5
+   391 000002FD FF7580              <1>  push %4
+   391 00000300 FF75C4              <1>  push %3
+   391 00000303 FF75F4              <1>  push %2
+   391 00000306 E825020000          <1>  call %1
+   391 0000030B 83C414              <1>  add esp, 20
+   392 0000030E 89857CFFFFFF            		mov		[ACZ], eax		; AC.Z = Z and save to zbuf
+   393                                  		; AC.r = C.r * (AC.y-A.y)/(C.y-A.y) + A.r * (C.y-AC.y)/(C.y-A.y);
+   394                                  		fcall 	interpolate, DWORD[AR], DWORD[CR], DWORD[ACY], DWORD[AY], DWORD[CY]
+   394 00000314 FF75C8              <1>  push %6
+   394 00000317 FF75F8              <1>  push %5
+   394 0000031A FF7580              <1>  push %4
+   394 0000031D FF75C0              <1>  push %3
+   394 00000320 FF75F0              <1>  push %2
+   394 00000323 E808020000          <1>  call %1
+   394 00000328 83C414              <1>  add esp, 20
+   395 0000032B 898578FFFFFF            		mov		[ACR], eax		; AC.R = R
+   396                                  		; AC.g = C.g * (AC.y-A.y)/(C.y-A.y) + A.g * (C.y-AC.y)/(C.y-A.y);
+   397                                  		fcall 	interpolate, DWORD[AG], DWORD[CG], DWORD[ACY], DWORD[AY], DWORD[CY]
+   397 00000331 FF75C8              <1>  push %6
+   397 00000334 FF75F8              <1>  push %5
+   397 00000337 FF7580              <1>  push %4
+   397 0000033A FF75BC              <1>  push %3
+   397 0000033D FF75EC              <1>  push %2
+   397 00000340 E8EB010000          <1>  call %1
+   397 00000345 83C414              <1>  add esp, 20
+   398 00000348 898574FFFFFF            		mov		[ACG], eax		; AC.G = G
+   399                                  		; AC.b = C.b * (AC.y-A.y)/(C.y-A.y) + A.b * (C.y-AC.y)/(C.y-A.y);
+   400                                  		fcall 	interpolate, DWORD[AB], DWORD[CB], DWORD[ACY], DWORD[AY], DWORD[CY]
+   400 0000034E FF75C8              <1>  push %6
+   400 00000351 FF75F8              <1>  push %5
+   400 00000354 FF7580              <1>  push %4
+   400 00000357 FF75B8              <1>  push %3
+   400 0000035A FF75E8              <1>  push %2
+   400 0000035D E8CE010000          <1>  call %1
+   400 00000362 83C414              <1>  add esp, 20
+   401 00000365 898570FFFFFF            		mov		[ACB], eax		; AC.B = B
+   402                                  					
+   403                                  		; Draw horizline between BC and AC.
+   404 0000036B 8D459C                  		lea		eax, [BCX]
+   405 0000036E 8D5D84                  		lea		ebx, [ACX]
+   406                                  		fcall 	horizline, DWORD[IMAGE], DWORD[XSIZE], eax, ebx, DWORD[ZBUF]
+   406 00000371 FF750C              <1>  push %6
+   406 00000374 53                  <1>  push %5
+   406 00000375 50                  <1>  push %4
+   406 00000376 FF7510              <1>  push %3
+   406 00000379 FF7508              <1>  push %2
+   406 0000037C E820000000          <1>  call %1
+   406 00000381 83C414              <1>  add esp, 20
+   407                                  		
+   408                                  		; Increment BC.Y
+   409 00000384 FF4598                  		inc		DWORD [BCY]			; BC.Y++
+   410 00000387 FF4580                  		inc		DWORD [ACY]			; AC.Y++
+   411                                  		; If AB.Y >= B.Y - proceed to BC_AC
+   412 0000038A 8B4598                  		mov		eax, [BCY]			; eax = BC.Y
+   413 0000038D 8B5DC8                  		mov		ebx, [CY]			; ebx = B.Y
+   414 00000390 39D8                    		cmp		eax, ebx
+   415 00000392 7D05                    		jge		BC_AC_end
+   416                                  		; Else - continue AB_AC loop
+   417 00000394 E9C2FEFFFF              		jmp 	BC_AC
+   418                                  		
+   419                                  BC_AC_end:
+   420                                  
+   421                                  end:
+   422                                  		leave	ebx, ecx, esi, edi	; subroutine epilogue
+   422 00000399 5F                  <1>  pop %4
+   422 0000039A 5E                  <1>  pop %3
+   422 0000039B 59                  <1>  pop %2
+   422 0000039C 5B                  <1>  pop %1
+   422 0000039D 89EC                <1>  mov esp, ebp
+   422 0000039F 5D                  <1>  pop ebp
+   422 000003A0 C3                  <1>  ret
+   423                                  		
+   424                                  ;###################################################################;
+   425                                  ; FUNCTIONS															;
+   426                                  ;###################################################################;
+   427                                  
+   428                                  ; Draw horizontal line between P1 and P2 ============================
+   429                                  ; Params: *image(ebp+8), xsize(+12), *P1.X(+16), *P2.X(+20), *zbuf(ebp+24)
+   430                                  ; Locals: P1'(ebp-4), P2'(ebp-28), CURR(ebp-52)
+   431                                  horizline:
+   432                                  		enter	ebx, 76		; subroutine prologue, 72B of local variables
+   432 000003A1 55                  <1>  push ebp
+   432 000003A2 89E5                <1>  mov ebp, esp
+   432 000003A4 83EC4C              <1>  sub esp, %2
+   432 000003A7 53                  <1>  push %1
+   433                                  
+   434                                  		; Copy P1 to P1'
+   435 000003A8 8D45FC                  		lea		eax, [ebp-4]		; eax = *P1'.X
+   436 000003AB 8B5D10                  		mov		ebx, [ebp+16]		; ebx = *P1.X
+   437                                  		fcall	vassign, eax, ebx	; P1' = P1
+   437 000003AE 53                  <1>  push %3
+   437 000003AF 50                  <1>  push %2
+   437 000003B0 E875020000          <1>  call %1
+   437 000003B5 83C408              <1>  add esp, 8
+   438                                  		
+   439                                  		; Copy P2 to P2'
+   440 000003B8 8D45E4                  		lea		eax, [ebp-28]		; eax = *P2'.X
+   441 000003BB 8B5D14                  		mov		ebx, [ebp+20]		; ebx = *P2.X
+   442                                  		fcall	vassign, eax, ebx	; P2' = P2
+   442 000003BE 53                  <1>  push %3
+   442 000003BF 50                  <1>  push %2
+   442 000003C0 E865020000          <1>  call %1
+   442 000003C5 83C408              <1>  add esp, 8
+   443                                  		
+   444                                  		; If P1.X <= P2.X - don't swap
+   445 000003C8 8B45FC                  		mov		eax, [ebp-4]		; eax = P1'.X
+   446 000003CB 8B5DE4                  		mov		ebx, [ebp-28]		; ebx = P2'.X
+   447 000003CE 39D8                    		cmp		eax, ebx
+   448 000003D0 7E10                    		jle		horizline_noswap		
+   449                                  		; Else swap		
+   450 000003D2 8D45FC                  		lea		eax, [ebp-4]		; eax = *P1'.X
+   451 000003D5 8D5DE4                  		lea		ebx, [ebp-28]		; ebx = *P2'.X
+   452                                  		fcall	vswap, eax, ebx
+   452 000003D8 53                  <1>  push %3
+   452 000003D9 50                  <1>  push %2
+   452 000003DA E8F1010000          <1>  call %1
+   452 000003DF 83C408              <1>  add esp, 8
+   453                                  		
+   454                                  horizline_noswap:				
+   455                                  		; Copy P1' to CURR
+   456 000003E2 8D45CC                  		lea		eax, [ebp-52]		; eax = *CURR.X
+   457 000003E5 8D5DFC                  		lea		ebx, [ebp-4]		; ebx = *P1'.X
+   458                                  		fcall	vassign, eax, ebx	; CURR = P1'
+   458 000003E8 53                  <1>  push %3
+   458 000003E9 50                  <1>  push %2
+   458 000003EA E83B020000          <1>  call %1
+   458 000003EF 83C408              <1>  add esp, 8
+   459                                  		
+   460                                  		;; Draw P1' and P2'
+   461                                  		;lea		eax, [ebp-4]		
+   462                                  		;fcall 	drawPixel, DWORD[ebp+8], DWORD[ebp+12], eax			
+   463                                  		;lea		eax, [ebp-28]		
+   464                                  		;fcall 	drawPixel, DWORD[ebp+8], DWORD[ebp+12], eax	
+   465                                  
+   466                                  		; If P1.X != P2.X - draw horizline
+   467 000003F2 8B45FC                  		mov		eax, [ebp-4]		; eax = P1'.X
+   468 000003F5 8B5DE4                  		mov		ebx, [ebp-28]		; ebx = P2'.X
+   469 000003F8 39D8                    		cmp		eax, ebx
+   470 000003FA 7505                    		jne		horizline_loop
+   471                                  		; Else don't draw - end of horizline		
+   472                                  		leave	ebx			; subroutine epilogue		
+   472 000003FC 5B                  <1>  pop %1
+   472 000003FD 89EC                <1>  mov esp, ebp
+   472 000003FF 5D                  <1>  pop ebp
+   472 00000400 C3                  <1>  ret
+   473                                  		
+   474                                  horizline_loop:		
+   475                                  		; Interpolate ZRGB values.
+   476                                  		; CURR.z = P2.z * (CURR.x-P1.x)/(P2.x-P1.x) + P1.z * (P2.x-CURR.x)/(P2.x-P1.x);
+   477                                  		fcall 	interpolate, DWORD[ebp-12], DWORD[ebp-36], DWORD[ebp-52], DWORD[ebp-4], DWORD[ebp-28]	
+   477 00000401 FF75E4              <1>  push %6
+   477 00000404 FF75FC              <1>  push %5
+   477 00000407 FF75CC              <1>  push %4
+   477 0000040A FF75DC              <1>  push %3
+   477 0000040D FF75F4              <1>  push %2
+   477 00000410 E81B010000          <1>  call %1
+   477 00000415 83C414              <1>  add esp, 20
+   478 00000418 8945C4                  		mov		[ebp-60], eax		; CURR.Z = Z		
+   479                                  		; CURR.r = P2.r * (CURR.x-P1.x)/(P2.x-P1.x) + P1.r * (P2.x-CURR.x)/(P2.x-P1.x);
+   480                                  		fcall 	interpolate, DWORD[ebp-16], DWORD[ebp-40], DWORD[ebp-52], DWORD[ebp-4], DWORD[ebp-28]
+   480 0000041B FF75E4              <1>  push %6
+   480 0000041E FF75FC              <1>  push %5
+   480 00000421 FF75CC              <1>  push %4
+   480 00000424 FF75D8              <1>  push %3
+   480 00000427 FF75F0              <1>  push %2
+   480 0000042A E801010000          <1>  call %1
+   480 0000042F 83C414              <1>  add esp, 20
+   481 00000432 8945C0                  		mov		[ebp-64], eax		; CURR.R = R
+   482                                  		; CURR.g = P2.g * (CURR.x-P1.x)/(P2.x-P1.x) + P1.g * (P2.x-CURR.x)/(P2.x-P1.x);
+   483                                  		fcall 	interpolate, DWORD[ebp-20], DWORD[ebp-44], DWORD[ebp-52], DWORD[ebp-4], DWORD[ebp-28]
+   483 00000435 FF75E4              <1>  push %6
+   483 00000438 FF75FC              <1>  push %5
+   483 0000043B FF75CC              <1>  push %4
+   483 0000043E FF75D4              <1>  push %3
+   483 00000441 FF75EC              <1>  push %2
+   483 00000444 E8E7000000          <1>  call %1
+   483 00000449 83C414              <1>  add esp, 20
+   484 0000044C 8945BC                  		mov		[ebp-68], eax		; CURR.G = G
+   485                                  		; CURR.b = P2.b * (CURR.x-P1.x)/(P2.x-P1.x) + P1.b * (P2.x-CURR.x)/(P2.x-P1.x);
+   486                                  		fcall 	interpolate, DWORD[ebp-24], DWORD[ebp-48], DWORD[ebp-52], DWORD[ebp-4], DWORD[ebp-28]
+   486 0000044F FF75E4              <1>  push %6
+   486 00000452 FF75FC              <1>  push %5
+   486 00000455 FF75CC              <1>  push %4
+   486 00000458 FF75D0              <1>  push %3
+   486 0000045B FF75E8              <1>  push %2
+   486 0000045E E8CD000000          <1>  call %1
+   486 00000463 83C414              <1>  add esp, 20
+   487 00000466 8945B8                  		mov		[ebp-72], eax		; CURR.B = B
+   488                                  			
+   489                                  		; Set the pixel in the image buffer if it's at Z top.
+   490                                  		; If CURR.Z > zbuffer(X, Y) -> don't draw the pixel
+   491 00000469 8D45CC                  		lea		eax, [ebp-52]
+   492                                  		fcall	getZbuf, DWORD[ebp+24], DWORD[ebp+12], eax	; eax = zbuffer(X, Y)
+   492 0000046C 50                  <1>  push %4
+   492 0000046D FF750C              <1>  push %3
+   492 00000470 FF7518              <1>  push %2
+   492 00000473 E875000000          <1>  call %1
+   492 00000478 83C40C              <1>  add esp, 12
+   493 0000047B 8B5DC4                  		mov		ebx, [ebp-60]		; ebx = CURR.Z
+   494 0000047E 39C3                    		cmp		ebx, eax
+   495 00000480 7724                    		ja		horizline_nodraw	; Jump if Above - for unsigned
+   496                                  		; Else draw the pixel in the image buffer
+   497 00000482 8D45CC                  		lea		eax, [ebp-52]
+   498                                  		fcall 	drawPixel, DWORD[ebp+8], DWORD[ebp+12], eax
+   498 00000485 50                  <1>  push %4
+   498 00000486 FF750C              <1>  push %3
+   498 00000489 FF7508              <1>  push %2
+   498 0000048C E82C000000          <1>  call %1
+   498 00000491 83C40C              <1>  add esp, 12
+   499 00000494 8D45CC                  		lea		eax, [ebp-52]
+   500                                  		fcall	setZbuf, DWORD[ebp+24], DWORD[ebp+12], eax
+   500 00000497 50                  <1>  push %4
+   500 00000498 FF750C              <1>  push %3
+   500 0000049B FF7518              <1>  push %2
+   500 0000049E E869000000          <1>  call %1
+   500 000004A3 83C40C              <1>  add esp, 12
+   501                                  horizline_nodraw:
+   502                                  
+   503                                  		; Increment CURR.X
+   504 000004A6 FF45CC                  		inc		DWORD [ebp-52]			; CURR.X++
+   505                                  		; If CURR.X > P2.X - end of loop
+   506 000004A9 8B45CC                  		mov		eax, [ebp-52]		; eax = CURR.X
+   507 000004AC 8B5DE4                  		mov		ebx, [ebp-28]		; ebx = P2'.X
+   508 000004AF 39D8                    		cmp		eax, ebx
+   509 000004B1 7D05                    		jge		horizline_end
+   510                                  		; Else - continue loop
+   511 000004B3 E949FFFFFF              		jmp 	horizline_loop
+   512                                  						
+   513                                  horizline_end:
+   514                                  		leave	ebx			; subroutine epilogue
+   514 000004B8 5B                  <1>  pop %1
+   514 000004B9 89EC                <1>  mov esp, ebp
+   514 000004BB 5D                  <1>  pop ebp
+   514 000004BC C3                  <1>  ret
+   515                                  ; ===================================================================		
+   516                                  		
+   517                                  ; Draw pixel ========================================================
+   518                                  ; Params: *image(ebp+8), xsize(+12), *P.X(+16)
+   519                                  drawPixel:
+   520                                  		enter	ebx, ecx, 0			; subroutine prologue
+   520 000004BD 55                  <1>  push ebp
+   520 000004BE 89E5                <1>  mov ebp, esp
+   520 000004C0 83EC00              <1>  sub esp, %3
+   520 000004C3 53                  <1>  push %1
+   520 000004C4 51                  <1>  push %2
+   521                                  		
+   522                                  		; Pixel offset: (xsize*Y + X) * 3 --> 3B per pixel
+   523 000004C5 8B4D10                  		mov		ecx, [ebp+16]		; ecx = *P
+   524 000004C8 8B450C                  		mov		eax, [ebp+12]		; eax = xsize
+   525 000004CB F761FC                  		mul		DWORD[ecx-4]		; eax = xsize * Y
+   526 000004CE 0301                    		add		eax, [ecx]			; eax = (xsize*Y + X)
+   527 000004D0 6BC003                  		imul	eax, 3				; eax = (xsize*Y + X) * 3
+   528                                  		
+   529 000004D3 034508                  		add		eax, [ebp+8]		; eax = *image + offset <-- pix address
+   530 000004D6 8B59EC                  		mov		ebx, [ecx-20]		; ebx = B
+   531 000004D9 8918                    		mov		[eax], ebx			; save B
+   532 000004DB 8B59F0                  		mov		ebx, [ecx-16]		; ebx = G
+   533 000004DE 895801                  		mov		[eax+1], ebx		; save G
+   534 000004E1 8B59F4                  		mov		ebx, [ecx-12]		; ebx = R
+   535 000004E4 895802                  		mov		[eax+2], ebx		; save R
+   536                                  				
+   537                                  		leave	ebx, ecx			; subroutine epilogue
+   537 000004E7 59                  <1>  pop %2
+   537 000004E8 5B                  <1>  pop %1
+   537 000004E9 89EC                <1>  mov esp, ebp
+   537 000004EB 5D                  <1>  pop ebp
+   537 000004EC C3                  <1>  ret
+   538                                  ; ===================================================================
+   539                                  
+   540                                  ; Get zbuffer =======================================================
+   541                                  ; Params: *zbuf(ebp+8), xsize(+12), *P.X(+16)
+   542                                  getZbuf:
+   543                                  		enter	ebx, 0				; subroutine prologue
+   543 000004ED 55                  <1>  push ebp
+   543 000004EE 89E5                <1>  mov ebp, esp
+   543 000004F0 83EC00              <1>  sub esp, %2
+   543 000004F3 53                  <1>  push %1
+   544                                  		
+   545                                  		; Pixel offset: (xsize*Y + X) * 4 --> 4B per pixel
+   546 000004F4 8B5D10                  		mov		ebx, [ebp+16]		; ebx = *P
+   547 000004F7 8B450C                  		mov		eax, [ebp+12]		; eax = xsize
+   548 000004FA F763FC                  		mul		DWORD[ebx-4]		; eax = xsize * Y
+   549 000004FD 0303                    		add		eax, [ebx]			; eax = (xsize*Y + X)
+   550 000004FF 6BC004                  		imul	eax, 4				; eax = (xsize*Y + X) * 4
+   551                                  		
+   552 00000502 034508                  		add		eax, [ebp+8]		; eax = *image + offset <-- pix address
+   553 00000505 8B00                    		mov		eax, [eax]			; ebx = zbuffer(X, Y)
+   554                                  				
+   555                                  		leave	ebx					; subroutine epilogue
+   555 00000507 5B                  <1>  pop %1
+   555 00000508 89EC                <1>  mov esp, ebp
+   555 0000050A 5D                  <1>  pop ebp
+   555 0000050B C3                  <1>  ret
+   556                                  ; ===================================================================
+   557                                  
+   558                                  ; Set zbuffer =======================================================
+   559                                  ; Params: *zbuf(ebp+8), xsize(+12), *P.X(+16)
+   560                                  setZbuf:
+   561                                  		enter	ebx, ecx, 0				; subroutine prologue
+   561 0000050C 55                  <1>  push ebp
+   561 0000050D 89E5                <1>  mov ebp, esp
+   561 0000050F 83EC00              <1>  sub esp, %3
+   561 00000512 53                  <1>  push %1
+   561 00000513 51                  <1>  push %2
+   562                                  		
+   563                                  		; Pixel offset: (xsize*Y + X) * 4 --> 4B per pixel
+   564 00000514 8B5D10                  		mov		ebx, [ebp+16]		; ebx = *P
+   565 00000517 8B450C                  		mov		eax, [ebp+12]		; eax = xsize
+   566 0000051A F763FC                  		mul		DWORD[ebx-4]		; eax = xsize * Y
+   567 0000051D 0303                    		add		eax, [ebx]			; eax = (xsize*Y + X)
+   568 0000051F 6BC004                  		imul	eax, 4				; eax = (xsize*Y + X) * 4
+   569                                  		
+   570 00000522 034508                  		add		eax, [ebp+8]		; eax = *image + offset <-- pix address
+   571 00000525 8B4BF8                  		mov		ecx, [ebx-8]		; ecx = P.Z
+   572 00000528 8908                    		mov		[eax], ecx		
+   573                                  				
+   574                                  		leave	ebx, ecx			; subroutine epilogue
+   574 0000052A 59                  <1>  pop %2
+   574 0000052B 5B                  <1>  pop %1
+   574 0000052C 89EC                <1>  mov esp, ebp
+   574 0000052E 5D                  <1>  pop ebp
+   574 0000052F C3                  <1>  ret
+   575                                  ; ===================================================================
+   576                                  
+   577                                  ; Calculate interpolation ===========================================
+   578                                  ; P.a = P2.a * (P.b-P1.b)/(P2.b-P1.b) + P1.a * (P2.b-P.b)/(P2.b-P1.b);
+   579                                  ; Params: P1.a(ebp+8), P2.a(+12), P.b(+16), P1.b(+20), P2.b(+24)
+   580                                  interpolate:
+   581                                  		enter	ebx, ecx, edx, esi, edi, 20	; subroutine prologue
+   581 00000530 55                  <1>  push ebp
+   581 00000531 89E5                <1>  mov ebp, esp
+   581 00000533 83EC14              <1>  sub esp, %6
+   581 00000536 53                  <1>  push %1
+   581 00000537 51                  <1>  push %2
+   581 00000538 52                  <1>  push %3
+   581 00000539 56                  <1>  push %4
+   581 0000053A 57                  <1>  push %5
+   582                                  		
+   583 0000053B 8B450C                  		mov		eax, [ebp+12]			; eax = P2.a
+   584 0000053E 8B5D10                  		mov		ebx, [ebp+16]			; ebx = P.b
+   585 00000541 2B5D14                  		sub		ebx, [ebp+20]			; ebx = P.b-P1.b
+   586 00000544 8B4D18                  		mov		ecx, [ebp+24]			; ecx = P2.b
+   587 00000547 2B4D14                  		sub		ecx, [ebp+20]			; ecx = P2.b-P1.b
+   588 0000054A BA00000000              		mov		edx, 0					; clean 63-32 bits of multiplication
+   589 0000054F F7E3                    		mul		ebx						; eax = eax*ebx = P2.a * (P.b-P1.b); res=edx:eax
+   590 00000551 F7F1                    		div		ecx						; eax = edx:eax / ecx = P2.a * (P.b-P1.b)/(P2.b-P1.b)
+   591                                  		
+   592 00000553 89C7                    		mov		edi, eax				; copy of result
+   593                                  		
+   594 00000555 8B4508                  		mov		eax, [ebp+8]			; eax = P1.a
+   595 00000558 8B7518                  		mov 	esi, [ebp+24]			; esi = P2.b
+   596 0000055B 2B7510                  		sub		esi, [ebp+16]			; esi = P2.b-P.b
+   597 0000055E BA00000000              		mov		edx, 0					; clean 63-32 bits of multiplication
+   598 00000563 F7E6                    		mul		esi						; eax = eax*esi = P1.a * (P2.b-P.b); res = edx:eax
+   599 00000565 F7F1                    		div		ecx						; eax = edx:eax / ecx = P1.a * (P2.b-P.b)/(P2.b-P1.b)
+   600                                  		
+   601 00000567 01F8                    		add		eax, edi				; eax = P2.a * (P.b-P1.b)/(P2.b-P1.b) + P1.a * (P2.b-P.b)/(P2.b-P1.b)		
+   602                                  		
+   603                                  		leave	ebx, ecx, edx, esi, edi	; subroutine epilogue
+   603 00000569 5F                  <1>  pop %5
+   603 0000056A 5E                  <1>  pop %4
+   603 0000056B 5A                  <1>  pop %3
+   603 0000056C 59                  <1>  pop %2
+   603 0000056D 5B                  <1>  pop %1
+   603 0000056E 89EC                <1>  mov esp, ebp
+   603 00000570 5D                  <1>  pop ebp
+   603 00000571 C3                  <1>  ret
+   604                                  ; ====================================================================
+   605                                  
+   606                                  ; Sort vertices by Y =================================================
+   607                                  ; Params: *A.X(ebp+8), *B.X(+12), *C.X(+16)
+   608                                  sort:
+   609                                  		enter	ebx, esi, edi, 0	; subroutine prologue
+   609 00000572 55                  <1>  push ebp
+   609 00000573 89E5                <1>  mov ebp, esp
+   609 00000575 83EC00              <1>  sub esp, %4
+   609 00000578 53                  <1>  push %1
+   609 00000579 56                  <1>  push %2
+   609 0000057A 57                  <1>  push %3
+   610                                  		
+   611                                  		; 1) A<->B
+   612                                  		; Load vertices to registers.
+   613 0000057B 8B4508                  		mov		eax, [ebp+8]		; eax = *A.X
+   614 0000057E 8B5D0C                  		mov		ebx, [ebp+12]		; ebx = *B.X		
+   615 00000581 8B70FC                  		mov		esi, [eax-4]		; eax = A.Y
+   616 00000584 8B7BFC                  		mov 	edi, [ebx-4]		; ebx = B.Y
+   617                                  		; If eax <= ebx -> jump to next comparizon
+   618 00000587 39FE                    		cmp		esi, edi			
+   619 00000589 7E0A                    		jle		sortAC			
+   620                                  		; Else call vswap function
+   621                                  		fcall	vswap, eax, ebx
+   621 0000058B 53                  <1>  push %3
+   621 0000058C 50                  <1>  push %2
+   621 0000058D E83E000000          <1>  call %1
+   621 00000592 83C408              <1>  add esp, 8
+   622                                  		
+   623                                  sortAC:	; 2) A<->C
+   624                                  		; Load vertices to registers.
+   625 00000595 8B4508                  		mov		eax, [ebp+8]		; eax = *A.X
+   626 00000598 8B5D10                  		mov		ebx, [ebp+16]		; ebx = *C.X		
+   627 0000059B 8B70FC                  		mov		esi, [eax-4]		; eax = A.Y
+   628 0000059E 8B7BFC                  		mov 	edi, [ebx-4]		; ebx = C.Y
+   629                                  		; If eax <= ebx -> jump to next comparizon
+   630 000005A1 39FE                    		cmp		esi, edi			
+   631 000005A3 7E0A                    		jle		sortBC			
+   632                                  		; Else call vswap function
+   633                                  		fcall	vswap, eax, ebx
+   633 000005A5 53                  <1>  push %3
+   633 000005A6 50                  <1>  push %2
+   633 000005A7 E824000000          <1>  call %1
+   633 000005AC 83C408              <1>  add esp, 8
+   634                                  		
+   635                                  sortBC:	; 3) B<->C
+   636                                  		; Load vertices to registers.
+   637 000005AF 8B450C                  		mov		eax, [ebp+12]		; eax = *B.X
+   638 000005B2 8B5D10                  		mov		ebx, [ebp+16]		; ebx = *C.X		
+   639 000005B5 8B70FC                  		mov		esi, [eax-4]		; eax = B.Y
+   640 000005B8 8B7BFC                  		mov 	edi, [ebx-4]		; ebx = C.Y
+   641                                  		; If eax <= ebx -> next of sort
+   642 000005BB 39FE                    		cmp		esi, edi			
+   643 000005BD 7E0A                    		jle		sort_end		
+   644                                  		; Else call vswap function
+   645                                  		fcall	vswap, eax, ebx
+   645 000005BF 53                  <1>  push %3
+   645 000005C0 50                  <1>  push %2
+   645 000005C1 E80A000000          <1>  call %1
+   645 000005C6 83C408              <1>  add esp, 8
+   646                                  
+   647                                  sort_end:		
+   648                                  		leave	ebx, esi, edi		; subroutine epilogue.
+   648 000005C9 5F                  <1>  pop %3
+   648 000005CA 5E                  <1>  pop %2
+   648 000005CB 5B                  <1>  pop %1
+   648 000005CC 89EC                <1>  mov esp, ebp
+   648 000005CE 5D                  <1>  pop ebp
+   648 000005CF C3                  <1>  ret
+   649                                  ; ====================================================================
+   650                                  
+   651                                  ; Swap vertices ======================================================
+   652                                  ; Params: *P1.X, *P2.X
+   653                                  vswap:
+   654                                  		enter	ebx, esi, edi, 0	; subroutine prologue
+   654 000005D0 55                  <1>  push ebp
+   654 000005D1 89E5                <1>  mov ebp, esp
+   654 000005D3 83EC00              <1>  sub esp, %4
+   654 000005D6 53                  <1>  push %1
+   654 000005D7 56                  <1>  push %2
+   654 000005D8 57                  <1>  push %3
+   655 000005D9 8B7508                  		mov		esi, [ebp+8]		; load *V1.X
+   656 000005DC 8B7D0C                  		mov		edi, [ebp+12]		; load *V2.X
+   657                                  		
+   658 000005DF 8B06                    		mov 	eax, [esi]		; swap every 4 bytes
+   659 000005E1 8B1F                    		mov 	ebx, [edi]
+   660 000005E3 8907                    		mov 	[edi], eax
+   661 000005E5 891E                    		mov 	[esi], ebx
+   662                                  		
+   663 000005E7 8B46FC                  		mov 	eax, [esi-4]
+   664 000005EA 8B5FFC                  		mov 	ebx, [edi-4]
+   665 000005ED 8947FC                  		mov 	[edi-4], eax
+   666 000005F0 895EFC                  		mov 	[esi-4], ebx
+   667                                  		
+   668 000005F3 8B46F8                  		mov 	eax, [esi-8]
+   669 000005F6 8B5FF8                  		mov 	ebx, [edi-8]
+   670 000005F9 8947F8                  		mov 	[edi-8], eax
+   671 000005FC 895EF8                  		mov 	[esi-8], ebx
+   672                                  		
+   673 000005FF 8B46F4                  		mov 	eax, [esi-12]
+   674 00000602 8B5FF4                  		mov 	ebx, [edi-12]
+   675 00000605 8947F4                  		mov 	[edi-12], eax
+   676 00000608 895EF4                  		mov 	[esi-12], ebx
+   677                                  		
+   678 0000060B 8B46F0                  		mov 	eax, [esi-16]
+   679 0000060E 8B5FF0                  		mov 	ebx, [edi-16]
+   680 00000611 8947F0                  		mov 	[edi-16], eax
+   681 00000614 895EF0                  		mov 	[esi-16], ebx
+   682                                  		
+   683 00000617 8B46EC                  		mov 	eax, [esi-20]
+   684 0000061A 8B5FEC                  		mov 	ebx, [edi-20]
+   685 0000061D 8947EC                  		mov 	[edi-20], eax
+   686 00000620 895EEC                  		mov 	[esi-20], ebx
+   687                                  		
+   688                                  		leave	ebx, esi, edi		; subroutine epilogue
+   688 00000623 5F                  <1>  pop %3
+   688 00000624 5E                  <1>  pop %2
+   688 00000625 5B                  <1>  pop %1
+   688 00000626 89EC                <1>  mov esp, ebp
+   688 00000628 5D                  <1>  pop ebp
+   688 00000629 C3                  <1>  ret
+   689                                  ;=====================================================================
+   690                                  
+   691                                  ; Assign vertices (P1 = P2) ==========================================
+   692                                  ; Params: *P1.X, *P2.X
+   693                                  vassign:
+   694                                  		enter	esi, edi, 0			; subroutine prologue
+   694 0000062A 55                  <1>  push ebp
+   694 0000062B 89E5                <1>  mov ebp, esp
+   694 0000062D 83EC00              <1>  sub esp, %3
+   694 00000630 56                  <1>  push %1
+   694 00000631 57                  <1>  push %2
+   695 00000632 8B7508                  		mov		esi, [ebp+8]		; load *P1.X
+   696 00000635 8B7D0C                  		mov		edi, [ebp+12]		; load *P2.X
+   697                                  		
+   698 00000638 8B07                    		mov 	eax, [edi]			; assign every 4 bytes
+   699 0000063A 8906                    		mov 	[esi], eax		
+   700 0000063C 8B47FC                  		mov 	eax, [edi-4]
+   701 0000063F 8946FC                  		mov 	[esi-4], eax		
+   702 00000642 8B47F8                  		mov 	eax, [edi-8]
+   703 00000645 8946F8                  		mov 	[esi-8], eax
+   704 00000648 8B47F4                  		mov 	eax, [edi-12]
+   705 0000064B 8946F4                  		mov 	[esi-12], eax
+   706 0000064E 8B47F0                  		mov 	eax, [edi-16]
+   707 00000651 8946F0                  		mov 	[esi-16], eax
+   708 00000654 8B47EC                  		mov 	eax, [edi-20]
+   709 00000657 8946EC                  		mov 	[esi-20], eax
+   710                                  		
+   711                                  		leave	esi, edi			; subroutine epilogue
+   711 0000065A 5F                  <1>  pop %2
+   711 0000065B 5E                  <1>  pop %1
+   711 0000065C 89EC                <1>  mov esp, ebp
+   711 0000065E 5D                  <1>  pop ebp
+   711 0000065F C3                  <1>  ret
+   712                                  ;=====================================================================
+   713                                  
+   714                                  
+   715                                  ;============================================
+   716                                  ; STOS
+   717                                  ;============================================
+   718                                  ;
+   719                                  ; wieksze adresy
+   720                                  ; 
+   721                                  ;  |                             |
+   722                                  ;  | ...                         |
+   723                                  ;  -------------------------------
+   724                                  ;  | *rgb						 | EBP+28
+   725                                  ;  -------------------------------
+   726                                  ;  | *vertices					 |
+   727                                  ;  -------------------------------
+   728                                  ;  | ysize						 |
+   729                                  ;  -------------------------------
+   730                                  ;  | xsize						 |
+   731                                  ;  -------------------------------
+   732                                  ;  | *zbuf						 |
+   733                                  ;  -------------------------------
+   734                                  ;  | *image						 | EBP+8
+   735                                  ;  -------------------------------
+   736                                  ;  | adres powrotu               | EBP+4
+   737                                  ;  -------------------------------
+   738                                  ;  | zachowane ebp               | EBP, ESP
+   739                                  ;  -------------------------------
+   740                                  ;  | A.X = vertices[0] address	 | EBP-4
+   741                                  ;  -------------------------------
+   742                                  ;  | B.X = vertices[3] address	 |
+   743                                  ;  -------------------------------
+   744                                  ;  | C.X = vertices[6] address	 | 
+   745                                  ;  -------------------------------
+   746                                  ;  | A.R = rgb[0] address		 | 
+   747                                  ;  -------------------------------
+   748                                  ;  | B.R = rgb[3] address		 | 
+   749                                  ;  -------------------------------
+   750                                  ;  | C.R = rgb[6] address		 | ESP
+   751                                  ;
+   752                                  ; \/                         \/
+   753                                  ; \/ w ta strone rosnie stos \/
+   754                                  ; \/                         \/
+   755                                  ;
+   756                                  ; mniejsze adresy
+   757                                  ;
+   758                                  ;
+   759                                  ;============================================

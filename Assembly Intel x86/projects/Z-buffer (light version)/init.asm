@@ -19,7 +19,7 @@ section	.text
 global  initBuffers
 
 initBuffers:
-		; Subroutine Prologue ========================================
+		; Incoming ========================================
 		push 	ebp     	; Save the old base pointer value.
 		mov 	ebp, esp 	; Set the new base pointer value.
 		sub 	esp, 12   	; Make room for 3x4B local variables
@@ -69,7 +69,7 @@ xloop:
 		
 	
 end:
-		; Subroutine Epilogue =====================================
+		; Outcoming =====================================
 		pop 	ecx			; recover calle-saved register values
 		pop		ebx
 		pop 	esi      	

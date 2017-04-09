@@ -8,7 +8,6 @@
 ;###################################################################;
 ; MACROS 															;
 ;###################################################################;
-; DEFINES ----> DRAWTRIANGLE FUNCTION ONLY!!!
 ; Functions parameters stack addresses
 %define IMAGE 	ebp+8
 %define ZBUF 	ebp+12
@@ -244,7 +243,7 @@ drawTriangle:
 		lea		ecx, [CX]
 		fcall	sort, eax, ebx, ecx
 		
-		; ************** Triangle filler *****************************
+		; Set start drawing points
 		; AB = A, AC = A, BC = B
 		lea		eax, [ABX]
 		lea		ebx, [AX]

@@ -1,5 +1,4 @@
 ###################################
-# autor: Aleksander Szulc
 # ARKO - projekt MIPS, zadanie 3.3 Z-bufor
 ###################################
 

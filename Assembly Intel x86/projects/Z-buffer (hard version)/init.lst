@@ -1,0 +1,110 @@
+     1                                  ;=====================================================================
+     2                                  ; Laboratorium ARKO - małe programy dla procesora Intel
+     3                                  ;
+     4                                  ; Autor: Aleksander Szulc
+     5                                  ; Data:  2015-05-25
+     6                                  ; Opis:  Zamienić wszystkie litery umieszczone między skrajnymi
+     7                                  ;		 znakami * na wielkie.	
+     8                                  ;
+     9                                  ;=====================================================================
+    10                                  %define IMAGE 	ebp+8
+    11                                  %define ZBUF 	ebp+12
+    12                                  %define XSIZE 	ebp+16
+    13                                  %define YSIZE 	ebp+20
+    14                                  %define RGB 	ebp+24
+    15                                  %define R 		4
+    16                                  %define G		8
+    17                                  %define B		12
+    18                                  
+    19                                  ;section .data
+    20                                  
+    21                                  section	.text
+    22                                  global  initBuffers
+    23                                  
+    24                                  initBuffers:
+    25                                  		; Subroutine Prologue ========================================
+    26 00000000 55                      		push 	ebp     	; Save the old base pointer value.
+    27 00000001 89E5                    		mov 	ebp, esp 	; Set the new base pointer value.
+    28 00000003 83EC0C                  		sub 	esp, 12   	; Make room for 3x4B local variables
+    29 00000006 57                      		push 	edi     	; Save the values of registers that the function
+    30 00000007 56                      		push 	esi     	; will modify. This function uses EDI and ESI.
+    31 00000008 53                      		push 	ebx
+    32 00000009 51                      		push	ecx
+    33                                  		; ============================================================
+    34                                  
+    35                                  		; Save R, G, B to stack
+    36 0000000A 8B4518                  		mov		eax, [RGB]			; address *rgb to eax
+    37 0000000D 8B18                    		mov 	ebx, [eax]			; R to ebx
+    38 0000000F 895DFC                  		mov		[ebp-R], ebx		; R to stack
+    39 00000012 8B5804                  		mov 	ebx, [eax+4]		; G to ebx
+    40 00000015 895DF8                  		mov		[ebp-G], ebx		; G to stack
+    41 00000018 8B5808                  		mov 	ebx, [eax+8]		; B to ebx
+    42 0000001B 895DF4                  		mov		[ebp-B], ebx		; B to stack
+    43                                  		
+    44                                  		
+    45                                  		; Set iterators.
+    46 0000001E BE00000000              		mov		esi, 0				; y iterator
+    47                                  yloop:	
+    48 00000023 BF00000000              		mov 	edi, 0				; x iterator
+    49                                  xloop:
+    50                                  		; Save RGB values.
+    51 00000028 8B4508                  		mov 	eax, [IMAGE]
+    52 0000002B 668B5DF4                		mov 	bx, [ebp-B]		; R to ebx
+    53 0000002F 668918                  		mov		[eax], bx		; R to image
+    54 00000032 668B5DF8                		mov 	bx, [ebp-G]		; G to ebx
+    55 00000036 66895801                		mov		[eax+1], bx		; G to image
+    56 0000003A 668B5DFC                		mov 	bx, [ebp-R]		; B to ebx
+    57 0000003E 66895802                		mov		[eax+2], bx		; B to image
+    58 00000042 83450803                		add     DWORD [IMAGE], 3; next byte
+    59                                  		; Set z-bufor to INF
+    60 00000046 8B450C                  		mov 	eax, [ZBUF]
+    61 00000049 C700FFFFFFFF            		mov 	DWORD [eax], 0xFFFFFFFF
+    62 0000004F 83450C04                		add		DWORD [ZBUF], 4	; next word
+    63                                  ;xloop	; If edi < xsize -> continue
+    64 00000053 47                      		inc		edi					; edi++ - increment iterator
+    65 00000054 3B7D10                  		cmp		edi, [XSIZE]
+    66 00000057 7CCF                    		jl		xloop
+    67                                  ;yloop	; If esi < ysize -> continue
+    68 00000059 46                      		inc		esi					; esi++ - increment iterator
+    69 0000005A 3B7514                  		cmp		esi, [YSIZE]
+    70 0000005D 7CC4                    		jl		yloop
+    71                                  		
+    72                                  		
+    73                                  	
+    74                                  end:
+    75                                  		; Subroutine Epilogue =====================================
+    76 0000005F 59                      		pop 	ecx			; recover calle-saved register values
+    77 00000060 5B                      		pop		ebx
+    78 00000061 5E                      		pop 	esi      	
+    79 00000062 5F                      		pop 	edi
+    80 00000063 89EC                    		mov 	esp, ebp 	; Deallocate local variables
+    81 00000065 5D                      		pop 	ebp 		; Restore the caller's base pointer value
+    82 00000066 C3                      		ret
+    83                                  		; =========================================================
+    84                                  
+    85                                  ;============================================
+    86                                  ; STOS
+    87                                  ;============================================
+    88                                  ;
+    89                                  ; wieksze adresy
+    90                                  ; 
+    91                                  ;  |                             |
+    92                                  ;  | ...                         |
+    93                                  ;  -------------------------------
+    94                                  ;  | parametr funkcji - char *a  | EBP+8
+    95                                  ;  -------------------------------
+    96                                  ;  | adres powrotu               | EBP+4
+    97                                  ;  -------------------------------
+    98                                  ;  | zachowane ebp               | EBP, ESP
+    99                                  ;  -------------------------------
+   100                                  ;  | ... tu ew. zmienne lokalne  | EBP-x
+   101                                  ;  |                             |
+   102                                  ;
+   103                                  ; \/                         \/
+   104                                  ; \/ w ta strone rosnie stos \/
+   105                                  ; \/                         \/
+   106                                  ;
+   107                                  ; mniejsze adresy
+   108                                  ;
+   109                                  ;
+   110                                  ;============================================
